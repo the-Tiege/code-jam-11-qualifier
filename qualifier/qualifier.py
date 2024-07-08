@@ -1,3 +1,10 @@
+"""
+qualifier.py
+
+This module contains my solution to code-jam-11-qualifier.
+
+"""
+
 from enum import auto, StrEnum
 import re
 import warnings
@@ -8,6 +15,9 @@ MAX_QUOTE_LENGTH = 50
 # The two classes below are available for you to use
 # You do not need to implement them
 class VariantMode(StrEnum):
+    """
+    Enum containing different quote modes
+    """
     NORMAL = auto()
     UWU = auto()
     PIGLATIN = auto()
@@ -20,14 +30,32 @@ class DuplicateError(Exception):
 
 
 class Quote:
+    """
+    Quote class is used to create quotes and modify them based on 
+    entered commands.
+
+    Attributes:
+        quote (str): A string containing the entered quote
+        mode (Variant): An enum used to dictate quote formatt.
+    """
     def __init__(self, quote: str, mode: "VariantMode") -> None:
-        self.quote = quote
+        """
+        Initializes Quote with specified transformation.
+        """
         self.mode = mode
+        self.quote = quote
+        self.quote = self._create_variant()
 
     def __str__(self) -> str:
+        """
+        String representation of quote
+        """
         return self.quote
 
     def _quote_to_piglatin(self) -> str:
+        """
+        Transforms quote to piglatin formatt
+        """
         piglatin_list = []
         for word in self.quote.split(" "):
             piglatin_list.append(self._word_to_piglatin(word))
@@ -40,9 +68,12 @@ class Quote:
         return piglatin_quote
 
     def _word_to_piglatin(self, word) -> str:
+        """
+        Transforms word to piglatin.
+        """
         vowels = ['a', 'e', 'i', 'o', 'u', 'A', 'E', 'I', 'O', 'U']
 
-        upperCase = word[0].isupper()
+        upper_case = word[0].isupper()
 
         if word[0] in vowels:
             word = word + "way"
@@ -56,12 +87,15 @@ class Quote:
                 index += 1
             word = word[index:] + cluster.lower() + "ay"
 
-        if upperCase:
+        if upper_case:
             word = word[0].upper() + word[1:]
 
         return word
 
     def _quote_to_uwu(self) -> str:
+        """
+        Transforms quote to uwu formatt
+        """
         uwu_quote = ""
 
         if re.search('[lLrRuU]', self.quote):
@@ -87,22 +121,90 @@ class Quote:
         return uwu_quote
 
     def _word_starts_with_u(self, word: str) -> str:
+        """
+        Handles case where word starts with a u 
+        in uwu transform.
+        """
         if word[0] in ['u', 'U']:
             word = f"{word[0]}-{word}"
         return word
 
     def _create_variant(self) -> str:
         """
-        Transforms the quote to the appropriate variant indicated by `self.mode` and returns the result
+        Transforms the quote to the appropriate variant 
+        indicated by `self.mode` and returns the result
         """
         if self.mode == VariantMode.NORMAL:
             return self.quote
-        elif self.mode == VariantMode.PIGLATIN:
+        if self.mode == VariantMode.PIGLATIN:
             return self._quote_to_piglatin()
-        elif self.mode == VariantMode.UWU:
+        if self.mode == VariantMode.UWU:
             return self._quote_to_uwu()
-        else:
-            raise ValueError("Unknown Variant")
+        raise ValueError("Unknown Variant")
+
+def get_commands(command:str) -> list[str]:
+    """
+    Gets commands from input command string.
+
+    Arguments:
+        command (str): string containing commands
+
+    Returns:
+        list[str]: list of commands extracted from input
+    """
+    if "uwu" in command or "piglatin" in command:
+        return command.split(" ", maxsplit=2)
+    return command.split(" ", maxsplit=1)
+
+def list_quotes() -> None:
+    """
+    Lists quotes stored in Database
+    """
+    quote_list = []
+    for quote_db in Database.get_quotes():
+        quote_list.append(f"- {quote_db}")
+    quotes = "\n".join(quote_list)
+    print(quotes)
+
+def get_quote_and_mode(commands:list[str]) -> tuple[str, VariantMode]:
+    """
+    Gets quote and mode commands list.
+
+    Arguments:
+        commands (list[str]): list of commands
+
+    Returns:
+        tuple[str, VariantMode]: tuple of extracted quote and mode
+    """
+    if len(commands) == 2 and (commands[1].startswith('"') or commands[1].startswith('“')):
+        return commands[1], VariantMode.NORMAL
+    if commands[1] == "uwu":
+        return commands[2], VariantMode.UWU
+    if commands[1] == "piglatin":
+        return commands[2], VariantMode.PIGLATIN
+
+    raise ValueError("Invalid command")
+
+
+def add_quote(commands:list[str]) -> None:
+    """
+    Adds quote to Database
+
+    Arguments:
+        commands (list[str]): list of commands
+    """
+    quote, mode = get_quote_and_mode(commands)
+
+    quote = quote.strip('"').strip('“').strip('”')
+
+    if len(quote) > MAX_QUOTE_LENGTH:
+        raise ValueError("Quote is too long")
+
+    try:
+        new_quote = Quote(quote=quote, mode=mode)
+        Database.add_quote(new_quote)
+    except DuplicateError:
+        print("Quote has already been added previously")
 
 
 def run_command(command: str) -> None:
@@ -116,53 +218,22 @@ def run_command(command: str) -> None:
         - `quote list` - print a formatted string that lists the current
            quotes to be displayed in discord flavored markdown
     """
-    commands = []
-    quote = ""
-    mode = ""
-
-    if "uwu" in command or "piglatin" in command:
-        commands = command.split(" ", maxsplit=2)
-    else:
-        commands = command.split(" ", maxsplit=1)
+    commands = get_commands(command)
 
     if commands[0] != "quote" or len(commands) < 2 or len(commands) > 3:
         raise ValueError("Invalid command")
-    elif commands[1] == "list":
-        quote_list = ""
-        for quote_db in Database.get_quotes():
-            quote_list += f"- {quote_db}\n"
 
-        print(quote_list, end="")
-
+    if commands[1] == "list":
+        list_quotes()
     else:
-        if len(commands) == 2 and (commands[1].startswith('"') or commands[1].startswith('“')):
-            quote = commands[1]
-            mode = VariantMode.NORMAL
-        else:
-            quote = commands[2]
-            if commands[1] == "uwu":
-                mode = VariantMode.UWU
-            elif commands[1] == "piglatin":
-                mode = VariantMode.PIGLATIN
-            else:
-                raise ValueError("Invalid command")
-
-        quote = quote.strip('"').strip('“').strip('”')
-
-        if len(quote) > MAX_QUOTE_LENGTH:
-            raise ValueError("Quote is too long")
-
-        try:
-            new_quote = Quote(quote=quote, mode=mode)
-            new_quote.quote = new_quote._create_variant()
-            Database.add_quote(new_quote)
-        except DuplicateError:
-            print("Quote has already been added previously")
-
+        add_quote(commands)
 
 # The code below is available for you to use
 # You do not need to implement it, you can assume it will work as specified
 class Database:
+    """
+    Database to contain quotes
+    """
     quotes: list["Quote"] = []
 
     @classmethod
@@ -176,15 +247,3 @@ class Database:
         if str(quote) in [str(quote) for quote in cls.quotes]:
             raise DuplicateError
         cls.quotes.append(quote)
-
-
-if __name__ == "__main__":
-    test_case = "Knights who say Ni"
-    test_case_2 = "Let us laze about in Usher's Rolls Royce"
-    run_command(f"quote uwu \"{test_case_2}\"")
-    run_command("quote piglatin \"test\"")
-    run_command("quote \"test\"")
-    run_command(f'quote “{test_case}”')
-    run_command("quote \"list\"")
-
-    print(type(Database.get_quotes()[0]))
